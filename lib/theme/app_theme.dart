@@ -99,7 +99,7 @@ class AppTheme {
     ),
 
     // Card theme - Enhanced visual hierarchy
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       color: surfaceLight,
       elevation: 2,
       shadowColor: shadowLight,
@@ -318,7 +318,7 @@ class AppTheme {
     ),
 
     // Tab bar theme with modern styling
-    tabBarTheme: TabBarTheme(
+    tabBarTheme: TabBarThemeData(
       labelColor: primaryLight,
       unselectedLabelColor: textSecondaryLight,
       indicatorColor: primaryLight,
@@ -364,7 +364,7 @@ class AppTheme {
     ),
 
     // Dialog theme with enhanced styling
-    dialogTheme: DialogTheme(
+    dialogTheme: DialogThemeData(
       backgroundColor: surfaceLight,
       elevation: 12, // Higher elevation for prominence
       shadowColor: shadowLight,
