@@ -3,6 +3,7 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../core/app_export.dart';
+import '../subscription/subscription_selection_screen.dart';
 import './widgets/registration_form.dart';
 import './widgets/role_selection_chips.dart';
 import './widgets/social_login_buttons.dart';
@@ -146,9 +147,26 @@ class _RegistrationScreenState extends State<RegistrationScreen>
       // Show success animation
       await _showWelcomeAnimation();
 
-      // Navigate to profile completion or home
+      // Navigate based on selected role
       if (mounted) {
-        Navigator.pushReplacementNamed(context, '/home-dashboard');
+        // If user selected "Task Poster" or "Both", show subscription selection
+        if (_selectedRole == 'poster' || _selectedRole == 'both') {
+          // Generate a mock user ID (in production, this would come from API response)
+          final userId = email.hashCode.toString();
+          
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => SubscriptionSelectionScreen(
+                userId: userId,
+                selectedRole: _selectedRole,
+              ),
+            ),
+          );
+        } else {
+          // For helpers only, go directly to home dashboard
+          Navigator.pushReplacementNamed(context, '/home-dashboard');
+        }
       }
     } catch (e) {
       if (mounted) {

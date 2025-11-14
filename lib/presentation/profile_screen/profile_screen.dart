@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../core/app_export.dart';
+import '../subscription/my_plan_dashboard_screen.dart';
 import './widgets/account_actions_widget.dart';
 import './widgets/achievement_section_widget.dart';
 import './widgets/my_tasks_section_widget.dart';
@@ -143,6 +144,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                       userData: userData,
                       onEditBio: _handleEditBio,
                     ),
+                    _buildSubscriptionSection(),
                     SettingsListWidget(
                       onAccountPreferences: _handleAccountPreferences,
                       onNotificationSettings: _handleNotificationSettings,
@@ -459,6 +461,64 @@ class _ProfileScreenState extends State<ProfileScreen>
       SnackBar(
         content: const Text('Opening help & support...'),
         backgroundColor: AppTheme.lightTheme.colorScheme.secondary,
+      ),
+    );
+  }
+
+  void _handleMySubscription() {
+    // Generate a mock user ID (in production, this would come from user data)
+    final userId = (userData['id'] ?? 1).toString();
+    
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MyPlanDashboardScreen(userId: userId),
+      ),
+    );
+  }
+
+  Widget _buildSubscriptionSection() {
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 4.w, vertical: 2.h),
+      decoration: BoxDecoration(
+        color: AppTheme.lightTheme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppTheme.lightTheme.colorScheme.outline.withValues(alpha: 0.2),
+          width: 1,
+        ),
+      ),
+      child: ListTile(
+        leading: Container(
+          padding: EdgeInsets.all(3.w),
+          decoration: BoxDecoration(
+            color: AppTheme.lightTheme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: CustomIconWidget(
+            iconName: 'subscriptions',
+            color: AppTheme.lightTheme.colorScheme.primary,
+            size: 5.w,
+          ),
+        ),
+        title: Text(
+          'My Subscription',
+          style: AppTheme.lightTheme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        subtitle: Text(
+          'View and manage your subscription plan',
+          style: AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
+            color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        trailing: Icon(
+          Icons.arrow_forward_ios,
+          size: 4.w,
+          color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
+        ),
+        onTap: _handleMySubscription,
       ),
     );
   }

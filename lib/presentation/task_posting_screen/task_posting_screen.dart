@@ -3,6 +3,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../core/app_export.dart';
+import '../../providers/subscription_provider.dart';
+import '../subscription/widgets/over_limit_alert_dialog.dart';
+import '../subscription/subscription_selection_screen.dart';
 import './widgets/category_selection_widget.dart';
 import './widgets/date_time_picker_widget.dart';
 import './widgets/location_selection_widget.dart';
@@ -33,6 +36,7 @@ class _TaskPostingScreenState extends State<TaskPostingScreen> {
   bool _isPosting = false;
 
   final int _maxTitleLength = 80;
+  final SubscriptionProvider _subscriptionProvider = SubscriptionProvider();
 
   @override
   void initState() {
@@ -40,6 +44,13 @@ class _TaskPostingScreenState extends State<TaskPostingScreen> {
     _titleController.addListener(_onFormChanged);
     _descriptionController.addListener(_onFormChanged);
     _paymentController.addListener(_onFormChanged);
+    _loadSubscriptionStatus();
+  }
+
+  Future<void> _loadSubscriptionStatus() async {
+    // Mock user ID - in production, get from auth context
+    final userId = '1'; // Replace with actual user ID
+    await _subscriptionProvider.fetchSubscriptionStatus(userId);
   }
 
   @override
@@ -727,11 +738,117 @@ class _TaskPostingScreenState extends State<TaskPostingScreen> {
     if (!_validateForm()) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Please fill in all required fields'),
+          content: const Text('Please fill in all required fields'),
           backgroundColor: AppTheme.lightTheme.colorScheme.error,
         ),
       );
       return;
+    }
+
+    // Parse task cost
+    final taskCostString = _paymentController.text.trim();
+    final taskCost = int.tryParse(taskCostString) ?? 0;
+    
+    if (taskCost <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Please enter a valid payment amount'),
+          backgroundColor: AppTheme.lightTheme.colorScheme.error,
+        ),
+      );
+      return;
+    }
+
+    // Check subscription limit
+    final subscriptionStatus = _subscriptionProvider.subscriptionStatus;
+    if (subscriptionStatus != null) {
+      if (subscriptionStatus.isLimitExceeded(taskCost)) {
+        // Show over-limit alert
+        await showOverLimitAlert(
+          context: context,
+          subscriptionStatus: subscriptionStatus,
+          taskCost: taskCost,
+          onUpgrade: () async {
+            // Navigate to upgrade screen
+            final userId = '1'; // Replace with actual user ID
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SubscriptionSelectionScreen(
+                  userId: userId,
+                ),
+              ),
+            );
+            // Reload subscription status after potential upgrade
+            await _loadSubscriptionStatus();
+            // Retry posting if user upgraded
+            if (_subscriptionProvider.subscriptionStatus != null &&
+                !_subscriptionProvider.subscriptionStatus!.isLimitExceeded(taskCost)) {
+              _postTask(); // Retry posting
+            }
+          },
+          onContinueWithCommission: () async {
+            // Continue with commission
+            final commission = subscriptionStatus.calculateCommission(taskCost);
+            final totalCost = subscriptionStatus.calculateTotalWithCommission(taskCost);
+            
+            // Show commission confirmation
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: Text(
+                  'Confirm with Commission',
+                  style: AppTheme.lightTheme.textTheme.titleLarge,
+                ),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Task Cost: ₹${taskCost.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
+                      style: AppTheme.lightTheme.textTheme.bodyMedium,
+                    ),
+                    SizedBox(height: 1.h),
+                    Text(
+                      'Platform Commission (6%): ₹${commission.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
+                      style: AppTheme.lightTheme.textTheme.bodyMedium?.copyWith(
+                        color: AppTheme.lightTheme.colorScheme.error,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(height: 1.h),
+                    Divider(),
+                    SizedBox(height: 1.h),
+                    Text(
+                      'Total: ₹${totalCost.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
+                      style: AppTheme.lightTheme.textTheme.titleMedium?.copyWith(
+                        color: AppTheme.lightTheme.colorScheme.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('Continue'),
+                  ),
+                ],
+              ),
+            );
+
+            if (confirmed == true) {
+              // Proceed with posting including commission
+              await _proceedWithTaskPosting(taskCost: totalCost.toInt());
+            }
+          },
+        );
+        return;
+      }
     }
 
     setState(() {
@@ -791,6 +908,25 @@ class _TaskPostingScreenState extends State<TaskPostingScreen> {
         return;
       }
 
+      // Proceed with normal posting
+      await _proceedWithTaskPosting(taskCost: taskCost);
+    } catch (e) {
+      setState(() {
+        _isPosting = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error posting task: ${e.toString()}'),
+            backgroundColor: AppTheme.lightTheme.colorScheme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _proceedWithTaskPosting({required int taskCost}) async {
+    try {
       // Simulate posting delay
       await Future.delayed(const Duration(seconds: 2));
 
@@ -828,7 +964,7 @@ class _TaskPostingScreenState extends State<TaskPostingScreen> {
                   Navigator.pop(context); // Close dialog
                   Navigator.pushReplacementNamed(context, '/home-dashboard');
                 },
-                child: Text('View My Tasks'),
+                child: const Text('View My Tasks'),
               ),
             ],
           ),
@@ -838,7 +974,7 @@ class _TaskPostingScreenState extends State<TaskPostingScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to post task. Please try again.'),
+            content: const Text('Failed to post task. Please try again.'),
             backgroundColor: AppTheme.lightTheme.colorScheme.error,
           ),
         );
